@@ -1,12 +1,15 @@
-import { useContext, useLayoutEffect } from "react";
+import { useContext, useLayoutEffect, useState, useEffect } from "react";
 import { View, StyleSheet } from "react-native";
 
 import ExpenseForm from "../components/ManageExpense/ExpenseForm";
 import IconButton from "../components/UI/IconButton";
+import LoadingOverlay from "../components/UI/LoadingOverlay";
 import { GlobalStyle } from "../constants/styles";
 import { ExpensesContext } from "../store/expenses-context";
+import { storeExpense, updateExpense, deleteExpense } from "../util/http";
 
 const ManageExpenses = ({ route, navigation }) => {
+  const { isFetching, setIsFetching } = useState(false);
   const expenseCtx = useContext(ExpensesContext);
   const editedExpenseId = route.params?.expenseId;
   const isEditing = !!editedExpenseId;
@@ -21,41 +24,59 @@ const ManageExpenses = ({ route, navigation }) => {
     });
   }, [navigation, isEditing]);
 
-  const deleteExpenseHandler = () => {
+  const deleteExpenseHandler = async () => {
+    try {
+      await deleteExpense(editedExpenseId);
+      expenseCtx.deleteExpense(editedExpenseId);
+    } catch (err) {
+      console.log(err);
+    } finally {
+      // setIsFetching(false);
+    }
+
     navigation.goBack();
-    expenseCtx.deleteExpense(editedExpenseId);
   };
 
   const CancelHandler = () => {
     navigation.goBack();
   };
 
-  const confirmHandler = (expenseData) => {
-    isEditing
-      ? expenseCtx.updateExpense(editedExpenseId, expenseData)
-      : expenseCtx.addExpense(expenseData);
+  async function confirmHandler(expenseData) {
+    if (isEditing) {
+      await updateExpense(editedExpenseId, expenseData);
+      expenseCtx.updateExpense(editedExpenseId, expenseData);
+    } else {
+      const id = await storeExpense(expenseData);
+      expenseCtx.addExpense({ ...expenseData, id: id });
+    }
     navigation.goBack();
-  };
+  }
 
   return (
-    <View style={styles.container}>
-      <ExpenseForm
-        submitButtonLabel={isEditing ? "Update" : "Add"}
-        onSubmit={confirmHandler}
-        onCancel={CancelHandler}
-        defaultValues={selectedExpense}
-      />
-      {isEditing && (
-        <View style={styles.deleteContainer}>
-          <IconButton
-            icon="trash"
-            color={GlobalStyle.colors.error500}
-            size={24}
-            onPress={deleteExpenseHandler}
+    <>
+      {!isFetching ? (
+        <View style={styles.container}>
+          <ExpenseForm
+            submitButtonLabel={isEditing ? "Update" : "Add"}
+            onSubmit={confirmHandler}
+            onCancel={CancelHandler}
+            defaultValues={selectedExpense}
           />
+          {isEditing && (
+            <View style={styles.deleteContainer}>
+              <IconButton
+                icon="trash"
+                color={GlobalStyle.colors.error500}
+                size={24}
+                onPress={deleteExpenseHandler}
+              />
+            </View>
+          )}
         </View>
+      ) : (
+        <LoadingOverlay />
       )}
-    </View>
+    </>
   );
 };
 
