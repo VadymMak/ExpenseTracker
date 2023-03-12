@@ -4,12 +4,14 @@ import { View, StyleSheet } from "react-native";
 import ExpenseForm from "../components/ManageExpense/ExpenseForm";
 import IconButton from "../components/UI/IconButton";
 import LoadingOverlay from "../components/UI/LoadingOverlay";
+import ErrorOverlay from "../components/UI/ErrorOverlay";
 import { GlobalStyle } from "../constants/styles";
 import { ExpensesContext } from "../store/expenses-context";
 import { storeExpense, updateExpense, deleteExpense } from "../util/http";
 
 const ManageExpenses = ({ route, navigation }) => {
   const { isFetching, setIsFetching } = useState(false);
+  const [error, setError] = useState();
   const expenseCtx = useContext(ExpensesContext);
   const editedExpenseId = route.params?.expenseId;
   const isEditing = !!editedExpenseId;
@@ -29,7 +31,7 @@ const ManageExpenses = ({ route, navigation }) => {
       await deleteExpense(editedExpenseId);
       expenseCtx.deleteExpense(editedExpenseId);
     } catch (err) {
-      console.log(err);
+      setError("Could not fetch expenses");
     } finally {
       // setIsFetching(false);
     }
@@ -41,41 +43,54 @@ const ManageExpenses = ({ route, navigation }) => {
     navigation.goBack();
   };
 
+  const errorHandler = () => {
+    setError(null);
+  };
+
   async function confirmHandler(expenseData) {
-    if (isEditing) {
-      await updateExpense(editedExpenseId, expenseData);
-      expenseCtx.updateExpense(editedExpenseId, expenseData);
-    } else {
-      const id = await storeExpense(expenseData);
-      expenseCtx.addExpense({ ...expenseData, id: id });
+    try {
+      if (isEditing) {
+        await updateExpense(editedExpenseId, expenseData);
+        expenseCtx.updateExpense(editedExpenseId, expenseData);
+      } else {
+        const id = await storeExpense(expenseData);
+        expenseCtx.addExpense({ ...expenseData, id: id });
+      }
+    } catch (err) {
+      setError("Could not fetch expenses");
     }
+
     navigation.goBack();
+  }
+
+  if (error && !isFetching) {
+    return <ErrorOverlay message={error} onConfirm={errorHandler} />;
+  }
+
+  if (isFetching) {
+    return <LoadingOverlay />;
   }
 
   return (
     <>
-      {!isFetching ? (
-        <View style={styles.container}>
-          <ExpenseForm
-            submitButtonLabel={isEditing ? "Update" : "Add"}
-            onSubmit={confirmHandler}
-            onCancel={CancelHandler}
-            defaultValues={selectedExpense}
-          />
-          {isEditing && (
-            <View style={styles.deleteContainer}>
-              <IconButton
-                icon="trash"
-                color={GlobalStyle.colors.error500}
-                size={24}
-                onPress={deleteExpenseHandler}
-              />
-            </View>
-          )}
-        </View>
-      ) : (
-        <LoadingOverlay />
-      )}
+      <View style={styles.container}>
+        <ExpenseForm
+          submitButtonLabel={isEditing ? "Update" : "Add"}
+          onSubmit={confirmHandler}
+          onCancel={CancelHandler}
+          defaultValues={selectedExpense}
+        />
+        {isEditing && (
+          <View style={styles.deleteContainer}>
+            <IconButton
+              icon="trash"
+              color={GlobalStyle.colors.error500}
+              size={24}
+              onPress={deleteExpenseHandler}
+            />
+          </View>
+        )}
+      </View>
     </>
   );
 };
