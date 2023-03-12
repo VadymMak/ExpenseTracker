@@ -59,7 +59,6 @@ const ManageExpenses = ({ route, navigation }) => {
     } catch (err) {
       setError("Could not fetch expenses");
     }
-
     navigation.goBack();
   }
 
